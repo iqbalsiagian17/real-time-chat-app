@@ -1,0 +1,139 @@
+html, body {
+  margin: 0;
+  padding: 0;
+  height: 100%;
+}
+
+
+.chat-container {
+  display: flex;
+  height: 100vh;
+  font-family: sans-serif;
+}
+
+.chat-sidebar {
+  width: 250px;
+  background: #f6f6f6;
+  padding: 16px;
+  border-right: 1px solid #ddd;
+}
+
+.sidebar-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: 12px;
+  border-bottom: 1px solid #ddd;
+}
+
+.sender-name {
+  font-size: 0.75rem;
+  color: #555;
+  margin-bottom: 2px;
+}
+
+
+.chat-user {
+  padding: 12px;
+  border-radius: 8px;
+  cursor: pointer;
+  margin-bottom: 8px;
+}
+
+.chat-user.selected {
+  background: #fff;
+  font-weight: bold;
+  border: 1px solid #ccc;
+}
+
+.chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.chat-header {
+  padding: 16px;
+  border-bottom: 1px solid #eee;
+  background: #fff;
+}
+
+.status {
+  font-size: 12px;
+  color: gray;
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
+  background: #fafafa;
+}
+
+.message {
+  display: flex;
+  margin-bottom: 10px;
+}
+
+.message.sent {
+  justify-content: flex-end;
+}
+
+.message.received {
+  justify-content: flex-start;
+}
+
+.message-bubble {
+  max-width: 60%;
+  background: #fff;
+  padding: 12px;
+  border-radius: 16px;
+  position: relative;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+}
+
+.message.sent .message-bubble {
+  background: #111;
+  color: white;
+}
+
+.time {
+  font-size: 10px;
+  color: gray;
+  text-align: right;
+  margin-top: 4px;
+}
+
+.chat-input {
+  padding: 16px;
+  border-top: 1px solid #eee;
+  background: white;
+}
+
+.chat-input input {
+  width: 100%;
+  padding: 12px;
+  border-radius: 20px;
+  border: 1px solid #ccc;
+  outline: none;
+}
+
+.chat-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  background: #f0f2f5;
+}
+
+.chat-container {
+  display: flex;
+  width: 800px;
+  height: 600px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
+  font-family: sans-serif;
+}

@@ -1,0 +1,107 @@
+/* Modal wrapper */
+.modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: rgba(0, 0, 0, 0.45);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 999;
+}
+
+/* Modal content box */
+.modal-content {
+  background-color: #ffffff;
+  padding: 20px;
+  width: 95%;
+  max-width: 400px;
+  border-radius: 8px;
+  box-shadow: 0 0 15px rgba(0, 0, 0, 0.25);
+  font-family: "Segoe UI", sans-serif;
+}
+
+/* Title */
+.modal-content h4 {
+  margin-top: 0;
+  font-size: 18px;
+}
+
+/* Search input */
+.search-input {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+/* List of users */
+.user-list {
+  max-height: 200px;
+  overflow-y: auto;
+  margin-bottom: 15px;
+}
+
+/* Each user item */
+.user-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 6px 0;
+  border-bottom: 1px solid #f0f0f0;
+}
+
+/* Select/Open buttons */
+.select-button,
+.open-button {
+  padding: 4px 8px;
+  font-size: 12px;
+  border: none;
+  border-radius: 4px;
+  background-color: #ececec;
+  cursor: pointer;
+}
+
+.select-button.selected {
+  background-color: #d1e7dd;
+}
+
+/* Group section */
+.group-section {
+  margin-top: 10px;
+}
+
+.group-name-input {
+  width: 100%;
+  padding: 8px 10px;
+  margin-bottom: 10px;
+  border-radius: 5px;
+  border: 1px solid #ccc;
+}
+
+/* Action buttons */
+.modal-actions {
+  text-align: right;
+  margin-top: 10px;
+}
+
+.create-button {
+  background-color: #25d366;
+  color: white;
+  border: none;
+  padding: 6px 12px;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cancel-button {
+  background-color: transparent;
+  color: #555;
+  border: none;
+  padding: 6px 12px;
+  margin-left: 10px;
+  cursor: pointer;
+}
