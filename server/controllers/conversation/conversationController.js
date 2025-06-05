@@ -123,14 +123,12 @@ exports.getUserConversationsWithLastMessage = async (req, res) => {
   const userId = req.user.id;
 
   try {
-    // 1. Ambil semua conversation yang diikuti user ini
     const participantRows = await Participant.findAll({
       where: { user_id: userId },
       attributes: ['conversation_id'],
     });
     const conversationIds = participantRows.map(p => p.conversation_id);
 
-    // 2. Ambil semua conversation + users
     const conversations = await Conversation.findAll({
       where: { id: conversationIds },
       include: [
@@ -142,7 +140,6 @@ exports.getUserConversationsWithLastMessage = async (req, res) => {
       ],
     });
 
-    // 3. Untuk masing-masing conversation, ambil pesan terakhir
     const withLastMessage = await Promise.all(
       conversations.map(async (conv) => {
         const lastMessage = await Message.findOne({
@@ -152,14 +149,11 @@ exports.getUserConversationsWithLastMessage = async (req, res) => {
         });
 
         const unreadCount = await UnreadMessage.count({
-          where: {
-            user_id: userId,
-            message_id: {
-              [Op.in]: sequelize.literal(`(
-                SELECT id FROM t_messages WHERE conversation_id = ${conv.id}
-              )`)
-            }
-          }
+          where: { user_id: userId },
+          include: [{
+            model: Message,
+            where: { conversation_id: conv.id },
+          }],
         });
 
         return {
@@ -171,8 +165,9 @@ exports.getUserConversationsWithLastMessage = async (req, res) => {
       })
     );
 
-    // 4. Urutkan berdasarkan lastMessageDate
-    const sorted = withLastMessage.sort((a, b) => new Date(b.lastMessageDate) - new Date(a.lastMessageDate));
+    const sorted = withLastMessage.sort(
+      (a, b) => new Date(b.lastMessageDate) - new Date(a.lastMessageDate)
+    );
 
     res.json({ message: 'Sorted conversations with last message', data: sorted });
   } catch (err) {

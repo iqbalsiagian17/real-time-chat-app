@@ -2,19 +2,33 @@ html, body {
   margin: 0;
   padding: 0;
   height: 100%;
+  font-family: sans-serif;
 }
 
+.chat-wrapper {
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: #f0f2f5;
+}
 
 .chat-container {
   display: flex;
-  height: 100vh;
-  font-family: sans-serif;
+  width: 800px;
+  height: 600px;
+  border: 1px solid #ccc;
+  border-radius: 12px;
+  overflow: hidden;
+  background: white;
+  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
 }
 
 .chat-sidebar {
   width: 250px;
   background: #f6f6f6;
-  padding: 16px;
+  display: flex;
+  flex-direction: column;
   border-right: 1px solid #ddd;
 }
 
@@ -22,22 +36,15 @@ html, body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding-bottom: 12px;
+  padding: 16px;
   border-bottom: 1px solid #ddd;
 }
-
-.sender-name {
-  font-size: 0.75rem;
-  color: #555;
-  margin-bottom: 2px;
-}
-
 
 .chat-user {
   padding: 12px;
   border-radius: 8px;
   cursor: pointer;
-  margin-bottom: 8px;
+  margin: 4px 8px;
 }
 
 .chat-user.selected {
@@ -46,10 +53,17 @@ html, body {
   border: 1px solid #ccc;
 }
 
+.sender-name {
+  font-size: 0.75rem;
+  color: #555;
+  margin-bottom: 2px;
+}
+
 .chat-main {
   flex: 1;
   display: flex;
   flex-direction: column;
+  height: 100%;
 }
 
 .chat-header {
@@ -68,6 +82,8 @@ html, body {
   padding: 24px;
   overflow-y: auto;
   background: #fafafa;
+  display: flex;
+  flex-direction: column;
 }
 
 .message {
@@ -88,7 +104,6 @@ html, body {
   background: #fff;
   padding: 12px;
   border-radius: 16px;
-  position: relative;
   box-shadow: 0 1px 3px rgba(0,0,0,0.1);
 }
 
@@ -116,24 +131,4 @@ html, body {
   border-radius: 20px;
   border: 1px solid #ccc;
   outline: none;
-}
-
-.chat-wrapper {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  background: #f0f2f5;
-}
-
-.chat-container {
-  display: flex;
-  width: 800px;
-  height: 600px;
-  border: 1px solid #ccc;
-  border-radius: 12px;
-  overflow: hidden;
-  background: white;
-  box-shadow: 0 8px 24px rgba(0,0,0,0.1);
-  font-family: sans-serif;
 }

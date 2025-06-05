@@ -29,27 +29,52 @@ export default function ChatRoom() {
   const [showCreate, setShowCreate] = useState(false);
 
   useEffect(() => {
-    if (!user) return;
-    const newSocket = io('http://localhost:5000', {
-      auth: { token: localStorage.getItem('token') },
-    });
+  if (!user) return;
 
-    newSocket.on('receiveMessage', (msg) => {
-      if (msg.conversation_id === conversationId) {
-        setMessages((prev) => [...prev, msg]);
+  const newSocket = io('http://localhost:5000', {
+    auth: { token: localStorage.getItem('token') },
+  });
+
+  // ✅ pakai newSocket, BUKAN socket
+  newSocket.on('receiveMessage', (msg) => {
+    setConversations((prev) => {
+      const existingIndex = prev.findIndex(c => c.id === msg.conversation_id);
+
+      if (existingIndex !== -1) {
+        const updated = [...prev];
+        const target = { ...updated[existingIndex] };
+
+        target.lastMessage = msg;
+        target.lastMessageDate = new Date().toISOString();
+
+        if (msg.conversation_id !== conversationId) {
+          target.unreadCount = (target.unreadCount || 0) + 1;
+        }
+
+        updated.splice(existingIndex, 1);
+        return [target, ...updated];
       }
+
+      return prev;
     });
 
-    newSocket.on('newConversation', (newConv) => {
-      setConversations((prev) => {
-        const exists = prev.some(c => c.id === newConv.id);
-        return exists ? prev : [...prev, newConv];
-      });
-    });
+    if (msg.conversation_id === conversationId) {
+      setMessages((prev) => [...prev, msg]);
+    }
+  });
 
-    setSocket(newSocket);
-    return () => newSocket.disconnect();
-  }, [conversationId, user]);
+  newSocket.on('newConversation', (newConv) => {
+    setConversations((prev) => {
+      const exists = prev.some(c => c.id === newConv.id);
+      return exists ? prev : [...prev, newConv];
+    });
+  });
+
+  setSocket(newSocket);
+
+  return () => newSocket.disconnect();
+}, [conversationId, user]);
+
 
   useEffect(() => {
   if (!user) return;
@@ -133,14 +158,21 @@ export default function ChatRoom() {
       <div className="chat-container">
         <ChatSidebar
           conversations={conversations}
+          setConversations={setConversations}
           user={user}
           currentId={conversationId}
           setId={setConversationId}
           onCreate={() => setShowCreate(true)}
+          socket={socket}
         />
 
         <div className="chat-main">
-          <ChatHeader user={user} participants={participants} isGroup={participants.length > 1} />
+          <ChatHeader
+            user={user}
+            participants={participants}
+            isGroup={participants.length > 1}
+            conversation={conversations.find(c => c.id === conversationId)}
+          />
 
           <ChatMessages messages={messages} user={user} isGroup={participants.length > 1} />
 
