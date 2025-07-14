@@ -132,3 +132,13 @@ html, body {
   border: 1px solid #ccc;
   outline: none;
 }
+
+.system-message {
+  font-style: italic;
+  background-color: #f0f0f0;
+  padding: 6px 16px;
+  border-radius: 10px;
+  display: inline-block;
+  margin-bottom: 8px;
+  font-size: 0.9rem;
+}

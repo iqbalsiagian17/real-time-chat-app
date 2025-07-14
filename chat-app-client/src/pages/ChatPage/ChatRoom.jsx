@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { io } from 'socket.io-client';
 import './ChatRoom.css';
 
@@ -7,9 +7,9 @@ import ChatHeader from '../../components/chat/ChatHeader';
 import ChatMessages from '../../components/chat/ChatMessages';
 import ChatInput from '../../components/chat/ChatInput';
 import CreateConversationModal from '../../components/chat/CreateConversationModal';
+import EmptyChatScreen from '../../components/chat/EmptyChatScreen';
 
 import {
-  getAllConversations,
   getParticipants,
   createConversation,
   getConversationsWithLastMessage,
@@ -20,142 +20,226 @@ import { useAuth } from '../../context/AuthContext';
 
 export default function ChatRoom() {
   const { user } = useAuth();
-  const [socket, setSocket] = useState(null);
+  const socketRef = useRef();
   const [messages, setMessages] = useState([]);
   const [conversationId, setConversationId] = useState(null);
   const [conversations, setConversations] = useState([]);
   const [participants, setParticipants] = useState([]);
   const [allUsers, setAllUsers] = useState([]);
   const [showCreate, setShowCreate] = useState(false);
+  const [typingUser, setTypingUser] = useState(null);
+  const [typingUsersMap, setTypingUsersMap] = useState({}); 
 
+  
+
+  // 🚀 Socket connection & listeners
   useEffect(() => {
-  if (!user) return;
+    if (!user) return;
 
-  const newSocket = io('http://localhost:5000', {
-    auth: { token: localStorage.getItem('token') },
-  });
+    const socket = io('http://localhost:5000', {
+      auth: { token: localStorage.getItem('token') },
+    });
 
-  // ✅ pakai newSocket, BUKAN socket
-  newSocket.on('receiveMessage', (msg) => {
-    setConversations((prev) => {
-      const existingIndex = prev.findIndex(c => c.id === msg.conversation_id);
+    socketRef.current = socket;
 
-      if (existingIndex !== -1) {
-        const updated = [...prev];
-        const target = { ...updated[existingIndex] };
+    socket.on('connect', () => console.log('✅ Socket connected:', socket.id));
 
-        target.lastMessage = msg;
-        target.lastMessageDate = new Date().toISOString();
+    socket.on('receiveMessage', (msg) => {
+      setConversations((prev) => {
+        const index = prev.findIndex((c) => c.id === msg.conversation_id);
+        if (index !== -1) {
+          const updated = [...prev];
+          const target = { ...updated[index] };
 
-        if (msg.conversation_id !== conversationId) {
-          target.unreadCount = (target.unreadCount || 0) + 1;
+          target.lastMessage = msg;
+          target.lastMessageDate = new Date().toISOString();
+
+          if (msg.conversation_id !== conversationId) {
+            target.unreadCount = (target.unreadCount || 0) + 1;
+          } else {
+            markAsRead(msg.conversation_id);
+          }
+
+          updated.splice(index, 1);
+          return [target, ...updated];
         }
-
-        updated.splice(existingIndex, 1);
-        return [target, ...updated];
-      }
-
-      return prev;
-    });
-
-    if (msg.conversation_id === conversationId) {
-      setMessages((prev) => [...prev, msg]);
-    }
-  });
-
-  newSocket.on('newConversation', (newConv) => {
-    setConversations((prev) => {
-      const exists = prev.some(c => c.id === newConv.id);
-      return exists ? prev : [...prev, newConv];
-    });
-  });
-
-  setSocket(newSocket);
-
-  return () => newSocket.disconnect();
-}, [conversationId, user]);
-
-
-  useEffect(() => {
-  if (!user) return;
-
-  getConversationsWithLastMessage().then((convs) => {
-    setConversations(convs);
-
-    getAllUsers().then((users) => {
-      const privateConvs = convs.filter(c => !c.is_group);
-      const existingUserIds = new Set();
-      privateConvs.forEach(c => {
-        c.Users?.forEach(u => {
-          if (u.id !== user.id) existingUserIds.add(u.id);
-        });
+        return prev;
       });
 
-      const filtered = users.filter(u => u.id !== user.id);
-      setAllUsers(filtered);
+      if (msg.conversation_id === conversationId) {
+        setMessages((prev) => [...prev, msg]);
+      }
     });
-  }).catch(err => {
-    console.error('Failed to fetch conversations:', err);
-  });
-}, [user]);
 
+    socket.on('newConversation', async (newConv) => {
+      console.log('📩 Received newConversation:', newConv);
+      setConversations((prev) => {
+        const exists = prev.some((c) => c.id === newConv.id);
+        return exists ? prev : [newConv, ...prev];
+      });
 
+      // Aktifkan jika ini untuk user sekarang
+      if (newConv.Users?.some((u) => u.id === user.id)) {
+        setConversationId(newConv.id);
+        const [msgs, parts] = await Promise.all([
+          getMessages(newConv.id),
+          getParticipants(newConv.id),
+        ]);
+        setMessages(msgs);
+        setParticipants(parts.filter((p) => p.id !== user.id));
+      }
+    });
+
+    socket.on('userOnline', ({ user_id, is_online, last_seen }) => {
+      setParticipants((prev) =>
+        prev.map((p) =>
+          p.id === user_id ? { ...p, is_online, last_seen } : p
+        )
+      );
+    });
+
+    return () => socket.disconnect();
+  }, [user, conversationId]);
+
+  // 📨 Fetch Conversations + Users
+  useEffect(() => {
+    if (!user) return;
+
+    getConversationsWithLastMessage()
+      .then((convs) => {
+        setConversations(convs);
+        return getAllUsers();
+      })
+      .then((users) => {
+        const filtered = users.filter((u) => u.id !== user.id);
+        setAllUsers(filtered);
+      })
+      .catch((err) => console.error('❌ Error fetch data:', err));
+  }, [user]);
+
+  // 📩 Fetch messages + participants for selected conversation
   useEffect(() => {
     if (!conversationId || !user) return;
 
     getMessages(conversationId).then(setMessages);
-
     getParticipants(conversationId).then((res) =>
       setParticipants(res.filter((p) => p.id !== user.id))
     );
   }, [conversationId, user]);
 
+
+ useEffect(() => {
+  const socket = socketRef.current;
+  if (!socket || !conversationId) return;
+
+  socket.on('userTyping', ({ user_id, username }) => {
+    if (user_id !== user.id) {
+      setTypingUser(username);
+    }
+  });
+
+  socket.on('userStopTyping', ({ user_id }) => {
+    if (user_id !== user.id) {
+      setTypingUser(null);
+    }
+  });
+
+  socket.emit('joinConversation', { conversation_id: conversationId });
+
+  return () => {
+    socket.off('userTyping');
+    socket.off('userStopTyping');
+  };
+}, [conversationId, user]);
+
+
+
+
+
+  useEffect(() => {
+  const socket = socketRef.current;
+  if (socket && conversationId) {
+    socket.emit('joinConversation', { conversation_id: conversationId });
+  }
+}, [conversationId]);
+
+
+
+  // 🟢 Send Message
   const sendMessage = (text) => {
-    if (!text.trim()) return;
+    if (!text.trim() || !socketRef.current) return;
 
-    const newMessage = {
+    socketRef.current.emit('sendMessage', {
+      conversation_id: conversationId, // boleh null
       content: text,
-      conversation_id: conversationId,
-      sender_id: user.id,
-      sender: user,
-      created_at: new Date().toISOString(),
-    };
-
-    socket.emit('sendMessage', {
-      conversation_id: conversationId,
-      content: text,
+      target_user_ids: !conversationId ? [targetUserId] : undefined, // user/group yang dituju
+      is_group: false, // atau true kalau dari group
+      name: null,      // nama group kalau group
     });
   };
 
+  // ➕ Create Conversation
   const handleCreateConversation = async (userIds, groupName = null) => {
+    if (!socketRef.current) return;
+
     try {
-      await createConversation(userIds, groupName);
-
-      const updatedConvs = await getAllConversations();
-      setConversations(updatedConvs);
-
-      const newConv = updatedConvs.find(c => {
-        const ids = c.Users.map(u => u.id).sort();
-        const selectedIds = [...userIds, user.id].sort();
-        return JSON.stringify(ids) === JSON.stringify(selectedIds);
+      socketRef.current.emit('createConversation', {
+        user_ids: userIds,
+        name: groupName,
       });
 
-      if (newConv) {
-        setConversationId(newConv.id);
-      }
+      setShowCreate(false); // langsung tutup modal
 
-      setShowCreate(false);
     } catch (err) {
-      console.error(err);
+      console.error('❌ Gagal membuat conversation:', err);
       alert('Gagal membuat conversation');
     }
   };
 
-  const otherUser = participants[0];
+  // ✅ Mark as Read
+  const markAsRead = async (conversationId) => {
+    try {
+      await fetch('http://localhost:5000/api/chat/mark-as-read', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${localStorage.getItem('token')}`,
+        },
+        body: JSON.stringify({ conversation_id: conversationId }),
+      });
+
+      setConversations((prev) =>
+        prev.map((c) =>
+          c.id === conversationId ? { ...c, unreadCount: 0 } : c
+        )
+      );
+    } catch (err) {
+      console.error('❌ Gagal markAsRead:', err);
+    }
+  };
+
+  useEffect(() => {
+  const socket = socketRef.current;
+  if (socket && conversationId) {
+    socket.emit('joinConversation', { conversation_id: conversationId });
+    console.log(`📡 Join conversation_${conversationId}`);
+  }
+}, [conversationId]);
+
+
+  // ⎋ Escape key untuk keluar percakapan
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') setConversationId(null);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, []);
 
   return (
     <div className="chat-wrapper">
       <div className="chat-container">
+        {/* Sidebar */}
         <ChatSidebar
           conversations={conversations}
           setConversations={setConversations}
@@ -163,22 +247,40 @@ export default function ChatRoom() {
           currentId={conversationId}
           setId={setConversationId}
           onCreate={() => setShowCreate(true)}
-          socket={socket}
+          typingUsersMap={typingUsersMap} // ✅ tambahkan ini
         />
 
-        <div className="chat-main">
-          <ChatHeader
-            user={user}
-            participants={participants}
-            isGroup={participants.length > 1}
-            conversation={conversations.find(c => c.id === conversationId)}
-          />
-
-          <ChatMessages messages={messages} user={user} isGroup={participants.length > 1} />
-
-          <ChatInput sendMessage={sendMessage} />
+        {/* Chat Area */}
+        <div className="chat-main" style={{ display: 'flex', flexDirection: 'column', flex: 1 }}>
+          {conversationId ? (
+            <>
+              <ChatHeader
+                user={user}
+                participants={participants}
+                isGroup={participants.length > 1}
+                conversation={conversations.find((c) => c.id === conversationId)}
+                  typingUser={typingUser} // ⬅️ Tambahkan ini!
+              />
+              <ChatMessages
+                messages={messages}
+                user={user}
+                isGroup={participants.length > 1}
+                conversation={conversations.find((c) => c.id === conversationId)} // ⬅️ tambahkan ini!
+                typingUser={typingUser} // ⬅️ Tambahkan ini
+              />
+              <ChatInput
+                sendMessage={sendMessage}
+                socketRef={socketRef}
+                conversationId={conversationId}
+                user={user}
+              />
+            </>
+          ) : (
+            <EmptyChatScreen />
+          )}
         </div>
 
+        {/* Modal */}
         {showCreate && (
           <CreateConversationModal
             users={allUsers}

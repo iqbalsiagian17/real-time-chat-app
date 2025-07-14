@@ -17,6 +17,12 @@ Conversation.belongsToMany(User, {
   through: Participant,
   foreignKey: 'conversation_id'
 });
+
+Conversation.belongsTo(User, {
+  as: 'creator',
+  foreignKey: 'creator_id'
+});
+
 User.belongsToMany(Conversation, {
   through: Participant,
   foreignKey: 'user_id'

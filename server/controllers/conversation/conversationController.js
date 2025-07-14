@@ -8,7 +8,7 @@ exports.createConversation = async (req, res) => {
 
   try {
     // Buat conversation
-    const conversation = await Conversation.create({ is_group, name });
+  const conversation = await Conversation.create({ is_group, name, creator_id: userId });
 
     // Tambahkan peserta (termasuk user pembuat)
     const allParticipants = [...new Set([...participantIds, userId])];
@@ -45,6 +45,11 @@ exports.getUserConversations = async (req, res) => {
           attributes: ['id', 'username'],
           through: { attributes: [] },
         },
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['id', 'username'],
+        },
       ],
       order: [['created_at', 'DESC']],
     });
@@ -64,7 +69,7 @@ exports.getParticipants = async (req, res) => {
       where: { conversation_id: id },
       include: {
         model: User,
-        attributes: ['id', 'username'],
+        attributes: ['id', 'username', 'email', 'is_online', 'last_seen'],
       },
     });
 
@@ -136,6 +141,11 @@ exports.getUserConversationsWithLastMessage = async (req, res) => {
           model: User,
           attributes: ['id', 'username'],
           through: { attributes: [] },
+        },
+        {
+          model: User,
+          as: 'creator',
+          attributes: ['id', 'username'],
         },
       ],
     });

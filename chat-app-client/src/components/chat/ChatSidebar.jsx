@@ -12,6 +12,7 @@ export default function ChatSidebar({
   currentId,
   setId,
   onCreate,
+  typingUsersMap,
 }) {
   const [search, setSearch] = useState('');
   const [readConversations, setReadConversations] = useState([]);
@@ -45,6 +46,7 @@ export default function ChatSidebar({
           search={search}
           readConversations={readConversations}
           setReadConversations={setReadConversations}
+            typingUsersMap={typingUsersMap} 
         />
       </div>
 

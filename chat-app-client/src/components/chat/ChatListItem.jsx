@@ -1,6 +1,12 @@
 import { useAuth } from '../../context/AuthContext';
 
-export default function ChatListItem({ conversation, currentId, onClick, readConversations }) {
+export default function ChatListItem({
+  conversation,
+  currentId,
+  onClick,
+  readConversations,
+  typingUsersMap = {}, // ⬅️ Tambahan: mapping userId => username
+}) {
   const { user } = useAuth();
 
   const isGroup = conversation.is_group;
@@ -22,10 +28,13 @@ export default function ChatListItem({ conversation, currentId, onClick, readCon
       })
     : '';
 
-const imageSrc = isGroup
-  ? '/image/group.png' // dari public/images/group.png
-  : '/image/user.png'; // dari public/images/user.png
+  const imageSrc = isGroup
+    ? '/image/group.png'
+    : '/image/user.png';
 
+  // 🟢 Tampilkan jika ada yang sedang mengetik (kecuali diri sendiri)
+  const typingInThisConversation = typingUsersMap[conversation.id];
+  const isSomeoneTyping = typingInThisConversation && typingInThisConversation.user_id !== user.id;
 
   return (
     <div
@@ -66,13 +75,16 @@ const imageSrc = isGroup
         <div
           style={{
             fontSize: '0.875rem',
-            color: '#555',
+            color: isSomeoneTyping ? 'green' : '#555',
             whiteSpace: 'nowrap',
             overflow: 'hidden',
             textOverflow: 'ellipsis',
+            fontStyle: isSomeoneTyping ? 'italic' : 'normal',
           }}
         >
-          {preview}
+          {isSomeoneTyping
+            ? `${typingInThisConversation.username} sedang mengetik...`
+            : preview}
         </div>
       </div>
 

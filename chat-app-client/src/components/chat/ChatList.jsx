@@ -9,6 +9,7 @@ export default function ChatList({
   search,
   readConversations,
   setReadConversations,
+  typingUsersMap, // ✅ teruskan
 }) {
   const { user } = useAuth(); // ✅ Ambil user dari context
   const token = localStorage.getItem('token');
@@ -54,6 +55,7 @@ export default function ChatList({
           currentId={currentId}
           onClick={() => handleClickConversation(c.id)}
           readConversations={readConversations}
+                      typingUsersMap={typingUsersMap} // ✅ teruskan
         />
       ))}
     </div>

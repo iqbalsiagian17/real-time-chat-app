@@ -1,13 +1,41 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { FaPaperPlane } from 'react-icons/fa';
 
-export default function ChatInput({ sendMessage }) {
+export default function ChatInput({ sendMessage, socketRef, conversationId, user }) {
   const [text, setText] = useState('');
+  const typingTimeout = useRef(null); // 🧠 timer untuk stopTyping
+
+  const handleTyping = () => {
+    if (!socketRef?.current || !conversationId) return;
+
+    socketRef.current.emit('typing', {
+      conversation_id: conversationId,
+      user_id: user.id,
+      username: user.username,
+    });
+
+    if (typingTimeout.current) clearTimeout(typingTimeout.current);
+
+    typingTimeout.current = setTimeout(() => {
+      socketRef.current.emit('stopTyping', {
+        conversation_id: conversationId,
+        user_id: user.id,
+      });
+    }, 3000); // ⏱️ 3 detik tidak ngetik, kirim stopTyping
+  };
 
   const handleSend = () => {
     if (text.trim()) {
       sendMessage(text.trim());
       setText('');
+    }
+
+    // kirim stopTyping saat kirim pesan
+    if (socketRef?.current && conversationId) {
+      socketRef.current.emit('stopTyping', {
+        conversation_id: conversationId,
+        user_id: user.id,
+      });
     }
   };
 
@@ -24,7 +52,10 @@ export default function ChatInput({ sendMessage }) {
         style={styles.input}
         rows={1}
         value={text}
-        onChange={(e) => setText(e.target.value)}
+        onChange={(e) => {
+          setText(e.target.value);
+          handleTyping(); // ⌨️ panggil saat mengetik
+        }}
         placeholder="Type a message..."
         onKeyDown={handleKeyDown}
       />
@@ -34,6 +65,7 @@ export default function ChatInput({ sendMessage }) {
     </div>
   );
 }
+
 
 const styles = {
   container: {

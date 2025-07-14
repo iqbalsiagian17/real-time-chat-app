@@ -1,10 +1,10 @@
 const { Server } = require('socket.io');
-const jwt = require('jsonwebtoken');
-const { Message, User, Conversation, Participant, UnreadMessage } = require('../models');
-const SECRET_KEY = process.env.JWT_SECRET || 'rahasia';
-
-// 🧠 Simpan semua socket aktif berdasarkan user_id
-const userSockets = {}; // key: user.id, value: Set of socket.id
+const authMiddleware = require('./middleware/auth');
+const { User } = require('../models');
+const { addUserSocket, removeUserSocket, getUserSockets,_debug_userSockets } = require('./utils/userSockets');
+const { handleSendMessage } = require('./handlers/messageHandler');
+const { handleCreateConversation } = require('./handlers/conversationHandler');
+const { handleTyping, handleStopTyping } = require('./handlers/typingHandler');
 
 function initSocket(server) {
   const io = new Server(server, {
@@ -14,104 +14,71 @@ function initSocket(server) {
     },
   });
 
-  // 🔐 Auth middleware
-  io.use((socket, next) => {
-    const token = socket.handshake.auth.token;
-    if (!token) return next(new Error('Unauthorized'));
+  io.use(authMiddleware);
+
+  io.on('connection', async (socket) => {
+    const userId = socket.user.id;
+    console.log(`🟢 ${socket.user.username} (${userId}) connected with socket ${socket.id}`);
+    addUserSocket(userId, socket.id);
+    console.log('📌 userSockets state:', JSON.stringify(Object.fromEntries(
+      Object.entries(_debug_userSockets).map(([k, v]) => [k, Array.from(v)])
+    )));
+
+    socket.on('typing', (data) => handleTyping(io, socket, data));
+    socket.on('stopTyping', (data) => handleStopTyping(io, socket, data));
+
+
 
     try {
-      const user = jwt.verify(token, SECRET_KEY);
-      socket.user = user;
-      next();
-    } catch {
-      return next(new Error('Invalid token'));
+      await User.update({ is_online: true }, { where: { id: userId } });
+
+      // ✅ Emit ke semua client bahwa user online
+      socket.broadcast.emit('userOnline', {
+        user_id: userId,
+        is_online: true,
+      });
+    } catch (err) {
+      console.error('❌ Gagal update is_online:', err.message);
     }
-  });
 
-  io.on('connection', (socket) => {
-    const userId = socket.user.id;
-    console.log(`🟢 ${socket.user.username} connected (${socket.id})`);
+    socket.on('sendMessage', (data) => handleSendMessage(io, socket, data));
+    socket.on('createConversation', (data) => handleCreateConversation(io, socket, data));
 
-    // Tambahkan socket ke daftar aktif
-    if (!userSockets[userId]) {
-      userSockets[userId] = new Set();
-    }
-    userSockets[userId].add(socket.id);
-
-    // 📩 Kirim pesan
-    socket.on('sendMessage', async (data) => {
-      const { conversation_id, content, type = 'text' } = data;
-
-      try {
-        const message = await Message.create({
-          conversation_id,
-          sender_id: userId,
-          content,
-          type,
-        });
-
-        const participants = await Participant.findAll({ where: { conversation_id } });
-
-        const unreadEntries = participants
-          .filter(p => p.user_id !== userId)
-          .map(p => ({ user_id: p.user_id, message_id: message.id }));
-        await UnreadMessage.bulkCreate(unreadEntries);
-
-        const fullMessage = await Message.findByPk(message.id, {
-          include: [{ model: User, as: 'sender', attributes: ['id', 'username'] }],
-        });
-
-        // Kirim ke semua peserta yang online
-        participants.forEach(p => {
-          const sockets = userSockets[p.user_id];
-          if (sockets) {
-            sockets.forEach(sid => io.to(sid).emit('receiveMessage', fullMessage));
-          }
-        });
-      } catch (err) {
-        console.error('❌ Error sendMessage:', err.message);
-        socket.emit('errorMessage', 'Gagal mengirim pesan.');
-      }
+    socket.on('joinConversation', ({ conversation_id }) => {
+      const room = `conversation_${conversation_id}`;
+      socket.join(room);
+      console.log(`🔗 Socket ${socket.id} joined room ${room}`);
     });
 
-    // 📦 Buat percakapan baru
-    socket.on('createConversation', async (data) => {
-      const { user_ids, name } = data;
+    socket.on('joinConversation', ({ conversation_id }) => {
+  const room = `conversation_${conversation_id}`;
+  socket.join(room);
+  console.log(`🔗 Socket ${socket.id} joined room ${room}`);
+});
 
-      try {
-        const allUserIds = [...user_ids, userId];
-        const isGroup = user_ids.length > 1;
+socket.on('typing', (data) => {
+  console.log(`✍️ Typing from ${data.username} in conversation_${data.conversation_id}`);
+  handleTyping(io, socket, data);
+});
 
-        const conversation = await Conversation.create({ is_group: isGroup, name });
-        await Participant.bulkCreate(allUserIds.map(uid => ({
-          conversation_id: conversation.id,
-          user_id: uid,
-        })));
-
-        const newConv = await Conversation.findByPk(conversation.id, {
-          include: [{ model: User, attributes: ['id', 'username'] }],
-        });
-
-        allUserIds.forEach(uid => {
-          const sockets = userSockets[uid];
-          if (sockets) {
-            sockets.forEach(sid => io.to(sid).emit('newConversation', newConv));
-          }
-        });
-      } catch (err) {
-        console.error('❌ Error creating conversation:', err.message);
-        socket.emit('errorMessage', 'Gagal membuat percakapan.');
-      }
-    });
-
-    // 🔴 Saat disconnect
-    socket.on('disconnect', () => {
+    socket.on('disconnect', async () => {
       console.log(`🔴 ${socket.user.username} disconnected`);
-      const sockets = userSockets[userId];
-      if (sockets) {
-        sockets.delete(socket.id);
-        if (sockets.size === 0) {
-          delete userSockets[userId];
+      removeUserSocket(userId, socket.id);
+
+      const stillConnected = getUserSockets(userId);
+      if (!stillConnected || stillConnected.size === 0) {
+        try {
+          const now = new Date();
+          await User.update({ is_online: false, last_seen: now }, { where: { id: userId } });
+
+          // ✅ Emit ke semua bahwa user offline
+          socket.broadcast.emit('userOnline', {
+            user_id: userId,
+            is_online: false,
+            last_seen: now.toISOString(),
+          });
+        } catch (err) {
+          console.error('❌ Gagal update last_seen:', err.message);
         }
       }
     });
